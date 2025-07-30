@@ -1,0 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env
+.env.*
+
+# AWS Lambda deployment packages (se você gerar ZIPs localmente)
+*.zip
+
+# VS Code settings
+.vscode/
+
+# Logs
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Git ignore itself
+.gitignore
+
+# Python packaging
+*.egg-info/
+dist/
+build/

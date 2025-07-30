@@ -1,0 +1,10 @@
+Requirements.txt
+Este arquivo lista todas as bibliotecas Python necessárias para executar este projeto, com as versões exatas usadas durante o desenvolvimento. Isso garante que o ambiente onde o código rodar terá as dependências corretas instaladas, evitando erros de incompatibilidade.
+
+Como criar o requirements.txt
+Se você estiver usando um ambiente virtual Python, execute o comando abaixo para gerar este arquivo com todas as dependências instaladas:
+pip freeze > requirements.txt
+Como instalar as dependências a partir do requirements.txt
+Para instalar todas as bibliotecas listadas, use o comando:
+pip install -r requirements.txt
+Isso facilita a configuração do ambiente em outros computadores ou servidores, garantindo que o projeto rode da mesma forma que no ambiente original.
