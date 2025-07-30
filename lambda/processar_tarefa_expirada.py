@@ -1,45 +1,54 @@
-import json
 import boto3
 import os
-import time
+from datetime import datetime, timezone
 from boto3.dynamodb.conditions import Attr
 
+# DynamoDB
 dynamodb = boto3.resource('dynamodb')
-table_name = os.environ['TABLE_NAME']
-table = dynamodb.Table(table_name)
+tabela = dynamodb.Table(os.environ['TAREFAS_TABLE_NAME'])
+
+# SES
+ses = boto3.client('ses', region_name='us-east-1')  # ajuste se estiver em outra região
+
+REMETENTE = "drinkcsgo@hotmail.com"  # e-mail verificado no SES
 
 def lambda_handler(event, context):
-    try:
-        agora = int(time.time())
+    # Obter hora atual em UTC
+    agora = datetime.now(timezone.utc)
 
-        # Scan para encontrar tarefas expiradas e não processadas
-        response = table.scan(
-            FilterExpression=Attr('ttl').lt(agora) & (Attr('processado').not_exists() | Attr('processado').eq(False))
-        )
-        tarefas = response.get('Items', [])
+    # Buscar tarefas não processadas e com data/hora no passado
+    resposta = tabela.scan(
+        FilterExpression=Attr('processado').eq(False) & Attr('data_hora').lt(agora.isoformat())
+    )
+    
+    tarefas_expiradas = resposta.get('Items', [])
 
-        if not tarefas:
-            return {
-                'statusCode': 200,
-                'body': json.dumps('Nenhuma tarefa expirada encontrada.')
-            }
-
-        for tarefa in tarefas:
-            # Atualizar a tarefa marcando processado = True
-            table.update_item(
-                Key={'id': tarefa['id']},
-                UpdateExpression="SET processado = :p",
-                ExpressionAttributeValues={':p': True}
+    for tarefa in tarefas_expiradas:
+        try:
+            # Enviar e-mail
+            ses.send_email(
+                Source=REMETENTE,
+                Destination={'ToAddresses': [tarefa['email']]},
+                Message={
+                    'Subject': {'Data': 'Tarefa Expirada'},
+                    'Body': {
+                        'Text': {
+                            'Data': f"Sua tarefa '{tarefa['descricao']}' expirou em {tarefa['data_hora']}."
+                        }
+                    }
+                }
             )
-            # Aqui pode ser inserida a lógica extra, tipo envio de e-mail, etc.
-
-        return {
-            'statusCode': 200,
-            'body': json.dumps(f"{len(tarefas)} tarefas processadas com sucesso.")
-        }
-
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'body': json.dumps({'error': str(e)})
-        }
+            
+            # Atualizar tarefa como processada
+            tabela.update_item(
+                Key={'id': tarefa['id']},
+                UpdateExpression="set processado = :val",
+                ExpressionAttributeValues={':val': True}
+            )
+        except Exception as e:
+            print(f"Erro ao processar tarefa {tarefa['id']}: {str(e)}")
+    
+    return {
+        'statusCode': 200,
+        'body': f"{len(tarefas_expiradas)} tarefas processadas."
+    }
