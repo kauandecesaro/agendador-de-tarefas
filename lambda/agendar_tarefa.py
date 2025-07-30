@@ -32,7 +32,8 @@ def lambda_handler(event, context):
         item = {
             'id': tarefa_id,
             'mensagem': mensagem,
-            'ttl': ttl
+            'ttl': ttl,
+            'processado': False
         }
         
         # Salva no DynamoDB

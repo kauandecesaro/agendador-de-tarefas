@@ -1,38 +1,41 @@
+import json
 import boto3
 import os
 import time
-import json
+from boto3.dynamodb.conditions import Attr
 
 dynamodb = boto3.resource('dynamodb')
-table_name = os.environ.get('TABLE_NAME')
+table_name = os.environ['TABLE_NAME']
 table = dynamodb.Table(table_name)
 
 def lambda_handler(event, context):
-    agora = int(time.time())
-
     try:
-        response = table.scan(
-            FilterExpression="#ttl_attr < :now",
-            ExpressionAttributeNames={"#ttl_attr": "ttl"},
-            ExpressionAttributeValues={":now": agora}
-        )
-        tarefas_expiradas = response.get('Items', [])
+        agora = int(time.time())
 
-        if not tarefas_expiradas:
+        # Scan para encontrar tarefas expiradas e não processadas
+        response = table.scan(
+            FilterExpression=Attr('ttl').lt(agora) & (Attr('processado').not_exists() | Attr('processado').eq(False))
+        )
+        tarefas = response.get('Items', [])
+
+        if not tarefas:
             return {
                 'statusCode': 200,
-                'body': json.dumps("Nenhuma tarefa expirada encontrada.")
+                'body': json.dumps('Nenhuma tarefa expirada encontrada.')
             }
 
-        for tarefa in tarefas_expiradas:
-            print(f"Processando tarefa expirada: {tarefa}")
-
-            # Deleta a tarefa após processar
-            table.delete_item(Key={'id': tarefa['id']})
+        for tarefa in tarefas:
+            # Atualizar a tarefa marcando processado = True
+            table.update_item(
+                Key={'id': tarefa['id']},
+                UpdateExpression="SET processado = :p",
+                ExpressionAttributeValues={':p': True}
+            )
+            # Aqui pode ser inserida a lógica extra, tipo envio de e-mail, etc.
 
         return {
             'statusCode': 200,
-            'body': json.dumps(f"{len(tarefas_expiradas)} tarefa(s) expiradas processadas.")
+            'body': json.dumps(f"{len(tarefas)} tarefas processadas com sucesso.")
         }
 
     except Exception as e:
